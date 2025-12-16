@@ -76,12 +76,117 @@
         .hide-labels .leaflet-tooltip {
             display: none;
         }
+
+        /* Custom Leaflet Control Button Styling */
+        .leaflet-bar button {
+            background-color: #fff;
+            border-bottom: 1px solid #ccc;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            display: block;
+            text-align: center;
+            text-decoration: none;
+            color: black;
+            cursor: pointer;
+        }
+        .leaflet-bar button:hover {
+            background-color: #f4f4f4;
+        }
+        .leaflet-bar button:first-child {
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+        }
+        .leaflet-bar button:last-child {
+            border-bottom-left-radius: 4px;
+            border-bottom-right-radius: 4px;
+            border-bottom: none;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content h2 { margin-bottom: 0.5rem; font-weight: bold; font-size: 1.5rem; }
+        .modal-content h3 { margin-top: 1rem; margin-bottom: 0.5rem; font-weight: bold; font-size: 1.1rem; }
+        .modal-content p { margin-bottom: 0.5rem; }
+        .modal-content ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 0.5rem; }
+        .modal-content code { background-color: #f3f4f6; padding: 2px 4px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+        .modal-content pre { background-color: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto; margin-bottom: 1rem; font-size: 0.85rem;}
     </style>
 </head>
 <body>
 
     <!-- Map Container -->
     <div id="map" class="hide-labels"></div>
+
+    <!-- Usage Guide Modal -->
+    <div id="usageModal" class="fixed inset-0 z-[2000] hidden modal-overlay flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col modal-content">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-lg">
+                <h2 class="text-xl font-bold text-gray-800 m-0">Indonesia CSV Map Plotter Guide</h2>
+                <button onclick="toggleModal()" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <!-- Modal Body (Scrollable) -->
+            <div class="p-6 overflow-y-auto text-gray-700 text-sm leading-relaxed">
+                <p>A lightweight, browser-based tool for plotting coordinate data from CSV files onto an interactive map of Indonesia. This application runs entirely in the client's browser—no server setup required.</p>
+
+                <h3>Features</h3>
+                <ul>
+                    <li><strong>Privacy-Focused:</strong> All CSV parsing and rendering happens locally in your browser.</li>
+                    <li><strong>Flexible CSV Support:</strong> Automatically detects common column names for latitude, longitude, and labels.</li>
+                    <li><strong>Multiple Map Styles:</strong> Standard, Satellite, Light/Dark, and Vector-only modes.</li>
+                    <li><strong>Export Capabilities:</strong> Export as PNG or SVG (Vector).</li>
+                </ul>
+
+                <h3>Usage Guide</h3>
+
+                <h4>1. Preparation</h4>
+                <p>Prepare your data in a <code>.csv</code> file. The file must have headers.</p>
+                <p><strong>Example CSV:</strong></p>
+<pre>
+City,Lat,Lon,Description
+Jakarta,-6.2088,106.8456,Capital City
+Bali,-8.4095,115.1889,Tourism Hub
+Surabaya,-7.2575,112.7521,Industrial Center
+</pre>
+
+                <h4>2. Plotting Data</h4>
+                <ul>
+                    <li>Click <strong>Choose File</strong> in the control panel.</li>
+                    <li>Select your <code>.csv</code> file.</li>
+                    <li>If the map doesn't plot automatically, check the <strong>Column Mapping</strong> section.</li>
+                </ul>
+
+                <h4>3. Customizing the View</h4>
+                <ul>
+                    <li>Use the <strong>Map Style</strong> dropdown to switch styles.</li>
+                    <li>If using <strong>Indonesia Only (Vector)</strong>, a color picker allows you to change the land color.</li>
+                </ul>
+
+                <h4>4. Exporting</h4>
+                <ul>
+                    <li><strong>For PNG:</strong> Use "Select Area" to crop, select resolution, then "Download PNG".</li>
+                    <li><strong>For SVG:</strong> Select the "Indonesia Only (Vector)" style, then click "Download SVG".</li>
+                </ul>
+                
+                <div class="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
+                    <p>Source code available at: <a href="https://github.com/ftharyanto/plotter" target="_blank" class="text-blue-600 hover:underline">github.com/ftharyanto/plotter</a></p>
+                </div>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg text-right">
+                <button onclick="toggleModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition">
+                    Close Guide
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Floating Control Panel -->
     <div class="control-panel" id="controlPanel">
@@ -248,6 +353,28 @@
         // and share the same container.
         const sharedSvgRenderer = L.svg();
 
+        // --- Custom Controls ---
+        // 1. Help/Usage Control (Bottom of Top-Left)
+        const HelpControl = L.Control.extend({
+            options: {
+                position: 'topleft'
+            },
+            onAdd: function(map) {
+                const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                const button = L.DomUtil.create('button', '', container);
+                button.innerHTML = '<svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                button.title = "Open Usage Guide";
+                button.onclick = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation(); // Prevent map click through
+                    toggleModal();
+                };
+                return container;
+            }
+        });
+        map.addControl(new HelpControl());
+
+
         // --- Tile Layers Definition ---
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -292,6 +419,22 @@
         const GEOJSON_URL = 'https://raw.githubusercontent.com/superpikar/indonesia-geojson/master/indonesia-province-simple.json';
 
         // --- 2. UI Functions ---
+
+        function toggleModal() {
+            const modal = document.getElementById('usageModal');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('usageModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                toggleModal();
+            }
+        });
 
         async function changeBasemap(style) {
             // 1. Remove existing basemap/tiles
@@ -609,7 +752,7 @@
                 allowTaint: true,
                 logging: false,
                 ignoreElements: (element) => {
-                    return element.id === 'controlPanel';
+                    return element.id === 'controlPanel' || element.id === 'usageModal';
                 }
             };
 
