@@ -165,7 +165,7 @@ Surabaya,-7.2575,112.7521,Industrial Center
                 <h4>3. Customizing the View</h4>
                 <ul>
                     <li>Use the <strong>Map Style</strong> dropdown to switch styles.</li>
-                    <li>If using <strong>Indonesia Only (Vector)</strong>, a color picker allows you to change the land color.</li>
+                    <li>If using <strong>Indonesia Only (Vector)</strong>, color pickers allow you to change the land, sea, and border colors.</li>
                 </ul>
 
                 <h4>4. Exporting</h4>
@@ -213,10 +213,23 @@ Surabaya,-7.2575,112.7521,Industrial Center
                 </select>
                 
                 <!-- Vector Map Controls (Hidden unless Vector map is selected) -->
-                <div id="vectorControls" class="hidden mt-2 p-2 bg-gray-50 rounded border border-gray-200">
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Land Color</label>
-                    <div class="flex items-center gap-2">
-                        <input type="color" id="basemapColorPicker" value="#f2efe9" oninput="updateBasemapColor(this.value)" class="h-8 w-full cursor-pointer rounded border border-gray-300 p-0.5 bg-white">
+                <div id="vectorControls" class="hidden mt-2 p-3 bg-gray-50 rounded border border-gray-200 space-y-3">
+                    <!-- Land Color -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Land Color</label>
+                        <div class="flex items-center gap-2 mb-2">
+                            <input type="color" id="landColorPicker" value="#f2efe9" oninput="updateBasemapColor(this.value)" class="h-8 w-full cursor-pointer rounded border border-gray-300 p-0.5 bg-white">
+                        </div>
+                        <div id="landColorPalette" class="flex flex-wrap gap-1"></div>
+                    </div>
+
+                    <!-- Sea Color -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Sea Color</label>
+                        <div class="flex items-center gap-2 mb-2">
+                            <input type="color" id="seaColorPicker" value="#aad3df" oninput="updateSeaColor(this.value)" class="h-8 w-full cursor-pointer rounded border border-gray-300 p-0.5 bg-white">
+                        </div>
+                        <div id="seaColorPalette" class="flex flex-wrap gap-1"></div>
                     </div>
                 </div>
 
@@ -234,13 +247,36 @@ Surabaya,-7.2575,112.7521,Industrial Center
                     </label>
                 </div>
 
-                <div class="flex items-center">
-                    <input type="checkbox" id="showIndonesiaCheck" onchange="toggleIndonesiaOverlay()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label for="showIndonesiaCheck" class="ml-2 block text-sm text-gray-900">
-                        Show Province Borders
-                    </label>
-                    <span id="geoJsonLoading" class="hidden ml-2 text-xs text-blue-500 italic">Loading...</span>
+                <!-- Unified Borders Control -->
+                <div class="mb-2">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="showIndonesiaCheck" onchange="toggleBorders()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <label for="showIndonesiaCheck" class="ml-2 block text-sm text-gray-900">
+                            Show Province Borders
+                        </label>
+                        <span id="geoJsonLoading" class="hidden ml-2 text-xs text-blue-500 italic">Loading...</span>
+                    </div>
+                    
+                    <!-- Indented Border Color Picker -->
+                    <div id="borderOptions" class="hidden ml-6 mt-2 p-2 bg-gray-50 rounded border border-gray-200 transition-all">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Border Color</label>
+                        <div class="flex items-center gap-2 mb-2">
+                            <input type="color" id="borderColorPicker" value="#999999" oninput="updateBorderColor(this.value)" class="h-8 w-full cursor-pointer rounded border border-gray-300 p-0.5 bg-white">
+                        </div>
+                        <div id="borderColorPalette" class="flex flex-wrap gap-1"></div>
+                    </div>
                 </div>
+            </div>
+
+            <!-- Marker Styling -->
+            <div class="mb-4 border-t border-gray-200 pt-3">
+                <h3 class="text-sm font-bold text-gray-700 mb-2">Marker Options</h3>
+                <div class="flex items-center gap-2 mb-2">
+                    <label class="text-sm text-gray-600">Pin Color:</label>
+                    <input type="color" id="markerColor" value="#ef4444" oninput="updateMapFromSelection()" class="h-8 w-16 cursor-pointer rounded border border-gray-300 p-0.5 bg-white">
+                </div>
+                <!-- Marker Palette Container -->
+                <div id="markerColorPalette" class="flex flex-wrap gap-1"></div>
             </div>
             
             <!-- Export Options -->
@@ -333,6 +369,18 @@ Surabaya,-7.2575,112.7521,Industrial Center
             <button onclick="resetMap()" class="mt-4 w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded transition">
                 Reset to Default
             </button>
+            
+            <!-- External Links Section -->
+            <div class="mt-4 pt-4 border-t border-gray-200 flex justify-between text-xs text-blue-600">
+                <a href="https://github.com/ftharyanto/plotter/blob/main/README.md" target="_blank" class="hover:underline flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                    Usage Guide
+                </a>
+                <a href="https://github.com/ftharyanto/plotter" target="_blank" class="hover:underline flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path></svg>
+                    GitHub Repo
+                </a>
+            </div>
         </div>
     </div>
 
@@ -383,17 +431,17 @@ Surabaya,-7.2575,112.7521,Industrial Center
                 crossOrigin: 'anonymous'
             }),
             satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: 'Tiles &copy; Esri &mdash; Source: Esri',
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
                 crossOrigin: 'anonymous'
             }),
             light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; CARTO',
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
                 subdomains: 'abcd',
                 maxZoom: 20,
                 crossOrigin: 'anonymous'
             }),
             dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; CARTO',
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
                 subdomains: 'abcd',
                 maxZoom: 20,
                 crossOrigin: 'anonymous'
@@ -445,15 +493,23 @@ Surabaya,-7.2575,112.7521,Industrial Center
             if (indonesiaBasemapLayer) {
                 map.removeLayer(indonesiaBasemapLayer);
             }
+            if (indonesiaOverlayLayer) {
+                map.removeLayer(indonesiaOverlayLayer);
+            }
 
             const vectorControls = document.getElementById('vectorControls');
             const svgBtn = document.getElementById('downloadSvgBtn');
+            const bordersCheckbox = document.getElementById('showIndonesiaCheck');
 
             // 2. Handle "Indonesia Vector" mode
             if (style === 'indonesia_vector') {
-                vectorControls.classList.remove('hidden'); // Show color picker
+                vectorControls.classList.remove('hidden'); // Show controls
                 svgBtn.classList.remove('hidden'); // Show SVG export button
-                document.getElementById('map').style.backgroundColor = '#aad3df'; // Ocean Blue
+                
+                // Set map background to current Sea Color
+                const currentSeaColor = document.getElementById('seaColorPicker').value;
+                document.getElementById('map').style.backgroundColor = currentSeaColor;
+                
                 document.getElementById('vectorLoading').classList.remove('hidden');
                 
                 try {
@@ -461,24 +517,33 @@ Surabaya,-7.2575,112.7521,Industrial Center
                         const response = await fetch(GEOJSON_URL);
                         const geoData = await response.json();
                         
-                        // Get current color from picker
-                        const initialColor = document.getElementById('basemapColorPicker').value;
+                        // Get current colors from pickers
+                        const initialFillColor = document.getElementById('landColorPicker').value;
+                        const initialBorderColor = document.getElementById('borderColorPicker').value;
 
                         indonesiaBasemapLayer = L.geoJSON(geoData, {
                             renderer: sharedSvgRenderer, // Force SVG renderer!
                             style: {
-                                color: "#999",
+                                color: initialBorderColor,
                                 weight: 1,
-                                fillColor: initialColor, 
+                                fillColor: initialFillColor, 
                                 fillOpacity: 1
                             }
                         });
                     }
+                    
+                    // Update border visibility based on checkbox state
+                    const showBorders = bordersCheckbox.checked;
+                    indonesiaBasemapLayer.setStyle({
+                        weight: showBorders ? 1 : 0,
+                        color: document.getElementById('borderColorPicker').value
+                    });
+
                     indonesiaBasemapLayer.addTo(map);
                     indonesiaBasemapLayer.bringToBack();
                     
                     // Zoom to Indonesia to look nice
-                    map.fitBounds(indonesiaBasemapLayer.getBounds());
+                    if(!currentData.length) map.fitBounds(indonesiaBasemapLayer.getBounds());
 
                 } catch (e) {
                     console.error(e);
@@ -492,12 +557,17 @@ Surabaya,-7.2575,112.7521,Industrial Center
                 
             } else {
                 // 3. Handle Standard Tile Layers
-                vectorControls.classList.add('hidden'); // Hide color picker
+                vectorControls.classList.add('hidden'); // Hide controls
                 svgBtn.classList.add('hidden'); // Hide SVG button
                 document.getElementById('map').style.backgroundColor = '#ddd'; // Reset to neutral
                 currentBasemap = basemaps[style];
                 currentBasemap.addTo(map);
                 currentBasemap.bringToBack();
+                
+                // Restore overlay if checked
+                if (bordersCheckbox.checked) {
+                    toggleBorders();
+                }
             }
         }
 
@@ -507,6 +577,26 @@ Surabaya,-7.2575,112.7521,Industrial Center
                     fillColor: color
                 });
             }
+        }
+
+        function updateBorderColor(color) {
+            // Apply to Basemap (if active)
+            if (indonesiaBasemapLayer && map.hasLayer(indonesiaBasemapLayer)) {
+                indonesiaBasemapLayer.setStyle({
+                    color: color
+                });
+            }
+            // Apply to Overlay (if active)
+            if (indonesiaOverlayLayer && map.hasLayer(indonesiaOverlayLayer)) {
+                indonesiaOverlayLayer.setStyle({
+                    color: color
+                });
+            }
+        }
+
+        function updateSeaColor(color) {
+            // Update HTML div background
+            document.getElementById('map').style.backgroundColor = color;
         }
 
         function togglePanel() {
@@ -533,53 +623,76 @@ Surabaya,-7.2575,112.7521,Industrial Center
             }
         }
 
-        async function toggleIndonesiaOverlay() {
+        // Renamed from toggleIndonesiaOverlay to toggleBorders to reflect unified logic
+        async function toggleBorders() {
             const isChecked = document.getElementById('showIndonesiaCheck').checked;
-            const loadingIndicator = document.getElementById('geoJsonLoading');
+            const borderOptions = document.getElementById('borderOptions');
+            const mode = document.getElementById('basemapSelect').value;
+            const borderColor = document.getElementById('borderColorPicker').value;
 
+            // Toggle UI visibility for border color
             if (isChecked) {
-                if (indonesiaOverlayLayer) {
-                    map.addLayer(indonesiaOverlayLayer);
-                } else {
-                    loadingIndicator.classList.remove('hidden');
-                    try {
-                        const response = await fetch(GEOJSON_URL);
-                        if (!response.ok) throw new Error('Network error');
-                        
-                        const geoData = await response.json();
-                        
-                        indonesiaOverlayLayer = L.geoJSON(geoData, {
-                            renderer: sharedSvgRenderer, // Force SVG renderer so it shares container with basemap
-                            style: function (feature) {
-                                return {
-                                    color: "#FF0000",
-                                    weight: 2,
-                                    opacity: 0.6,
-                                    fillColor: "#ffaaaa",
-                                    fillOpacity: 0.1
-                                };
-                            },
-                            onEachFeature: function (feature, layer) {
-                                if (feature.properties && feature.properties.Propinsi) {
-                                    layer.bindTooltip(feature.properties.Propinsi, {
-                                        sticky: true,
-                                        className: 'bg-white px-2 py-1 border border-gray-300 rounded text-xs'
-                                    });
-                                }
-                            }
-                        }).addTo(map);
-                        
-                    } catch (error) {
-                        console.error("Error fetching GeoJSON:", error);
-                        alert("Failed to load Indonesia borders.");
-                        document.getElementById('showIndonesiaCheck').checked = false;
-                    } finally {
-                        loadingIndicator.classList.add('hidden');
-                    }
+                borderOptions.classList.remove('hidden');
+            } else {
+                borderOptions.classList.add('hidden');
+            }
+
+            if (mode === 'indonesia_vector') {
+                // In Vector Mode: Toggle the stroke of the existing base layer
+                if (indonesiaBasemapLayer) {
+                    indonesiaBasemapLayer.setStyle({
+                        weight: isChecked ? 1 : 0,
+                        color: borderColor
+                    });
                 }
             } else {
-                if (indonesiaOverlayLayer) {
-                    map.removeLayer(indonesiaOverlayLayer);
+                // In Standard Mode: Toggle the separate Overlay Layer
+                if (isChecked) {
+                    const loadingIndicator = document.getElementById('geoJsonLoading');
+                    
+                    if (indonesiaOverlayLayer) {
+                        indonesiaOverlayLayer.setStyle({ color: borderColor });
+                        map.addLayer(indonesiaOverlayLayer);
+                    } else {
+                        loadingIndicator.classList.remove('hidden');
+                        try {
+                            // If we haven't loaded data yet
+                            const response = await fetch(GEOJSON_URL);
+                            const geoData = await response.json();
+                            
+                            indonesiaOverlayLayer = L.geoJSON(geoData, {
+                                renderer: sharedSvgRenderer,
+                                style: function (feature) {
+                                    return {
+                                        color: borderColor,
+                                        weight: 2,
+                                        opacity: 0.8,
+                                        fill: false, // Only borders for overlay
+                                        fillOpacity: 0
+                                    };
+                                },
+                                onEachFeature: function (feature, layer) {
+                                    if (feature.properties && feature.properties.Propinsi) {
+                                        layer.bindTooltip(feature.properties.Propinsi, {
+                                            sticky: true,
+                                            className: 'bg-white px-2 py-1 border border-gray-300 rounded text-xs'
+                                        });
+                                    }
+                                }
+                            }).addTo(map);
+                            
+                        } catch (error) {
+                            console.error(Error, error);
+                            alert("Failed to load borders.");
+                            document.getElementById('showIndonesiaCheck').checked = false;
+                        } finally {
+                            loadingIndicator.classList.add('hidden');
+                        }
+                    }
+                } else {
+                    if (indonesiaOverlayLayer) {
+                        map.removeLayer(indonesiaOverlayLayer);
+                    }
                 }
             }
         }
@@ -655,7 +768,18 @@ Surabaya,-7.2575,112.7521,Industrial Center
             // 2. Clone it to modify without touching the DOM
             const svgClone = svgOverlay.cloneNode(true);
             
-            // 3. Calculate ViewBox
+            // 3. Add Background Color (Sea)
+            // Leaflet doesn't make a "sea" element, it uses the div background. 
+            // We must add a rect for the sea color in the exported SVG.
+            const seaColor = document.getElementById('seaColorPicker').value;
+            const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            bgRect.setAttribute("width", "100%");
+            bgRect.setAttribute("height", "100%");
+            bgRect.setAttribute("fill", seaColor);
+            // Insert as the first child so it's behind everything
+            svgClone.insertBefore(bgRect, svgClone.firstChild);
+
+            // 4. Calculate ViewBox
             let bounds;
             if (exportRectangle) {
                 bounds = exportRectangle.getBounds();
@@ -683,9 +807,10 @@ Surabaya,-7.2575,112.7521,Industrial Center
             svgClone.style.left = '0';
             svgClone.style.top = '0';
 
-            // 4. Inject Markers (Pins) as Circles
+            // 5. Inject Markers (Pins) as Circles
             const latKey = document.getElementById('latSelect').value;
             const lngKey = document.getElementById('lngSelect').value;
+            const markerColor = document.getElementById('markerColor').value; 
 
             if (currentData.length > 0 && latKey && lngKey) {
                 const markerGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -706,7 +831,7 @@ Surabaya,-7.2575,112.7521,Industrial Center
                                 circle.setAttribute("cx", pt.x);
                                 circle.setAttribute("cy", pt.y);
                                 circle.setAttribute("r", "4"); 
-                                circle.setAttribute("fill", "#2563eb"); 
+                                circle.setAttribute("fill", markerColor); 
                                 circle.setAttribute("stroke", "white");
                                 circle.setAttribute("stroke-width", "1");
                                 
@@ -722,7 +847,7 @@ Surabaya,-7.2575,112.7521,Industrial Center
                 svgClone.appendChild(markerGroup);
             }
 
-            // 5. Serialize and Download
+            // 6. Serialize and Download
             const serializer = new XMLSerializer();
             let source = serializer.serializeToString(svgClone);
 
@@ -858,10 +983,28 @@ Raja Ampat,-0.2333,130.5167,Diving Paradise`;
             plotPoints(currentData, latCol, lngCol, labelCol);
         }
 
+        // --- Custom Marker Icon Generator ---
+        function getCustomIcon(color) {
+            const svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" style="filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.4));"><path fill="${color}" stroke="white" stroke-width="1" d="M12 0C7 0 3 4 3 9c0 5 9 13 9 13s9-8 9-13c0-5-4-9-9-9z"/><circle cx="12" cy="9" r="3" fill="white"/></svg>`;
+            
+            return L.divIcon({
+                className: 'custom-pin', // minimal styling needed
+                html: svgHtml,
+                iconSize: [24, 24],
+                iconAnchor: [12, 24], // Bottom center
+                popupAnchor: [0, -24],
+                tooltipAnchor: [12, -12] 
+            });
+        }
+
         function plotPoints(data, latKey, lngKey, labelKey) {
             markersLayer.clearLayers();
             let bounds = L.latLngBounds();
             let count = 0;
+            
+            // Get selected marker color
+            const markerColor = document.getElementById('markerColor').value;
+            const customIcon = getCustomIcon(markerColor);
 
             data.forEach(row => {
                 if (row[latKey] && row[lngKey]) {
@@ -869,7 +1012,7 @@ Raja Ampat,-0.2333,130.5167,Diving Paradise`;
                     const lng = parseFloat(row[lngKey]);
 
                     if (!isNaN(lat) && !isNaN(lng)) {
-                        const marker = L.marker([lat, lng]);
+                        const marker = L.marker([lat, lng], { icon: customIcon });
                         
                         let popupContent = `<div class="font-bold text-lg">${row[labelKey] || 'Location'}</div>`;
                         let details = "";
@@ -918,6 +1061,45 @@ Raja Ampat,-0.2333,130.5167,Diving Paradise`;
             };
             reader.readAsText(file);
         });
+
+        // --- 8. Palette Initialization ---
+
+        const paletteColors = [
+            "#ef4444", // Red
+            "#10b981", // Green
+            "#3b82f6", // Blue
+            "#eab308", // Yellow
+            "#f97316", // Orange
+            "#f2efe9", // Default Land (Neutral)
+            "#aad3df", // Default Sea (Blue)
+            "#999999", // Default Border (Grey)
+            "#ffffff", // White
+            "#000000"  // Black
+        ];
+
+        function createPalette(containerId, inputId, callback) {
+            const container = document.getElementById(containerId);
+            const input = document.getElementById(inputId);
+            
+            paletteColors.forEach(color => {
+                const swatch = document.createElement('div');
+                swatch.className = 'w-4 h-4 rounded-full cursor-pointer border border-gray-300 hover:scale-110 transition-transform';
+                swatch.style.backgroundColor = color;
+                swatch.title = color;
+                swatch.onclick = () => {
+                    input.value = color;
+                    callback(color);
+                };
+                container.appendChild(swatch);
+            });
+        }
+
+        // Initialize Palettes
+        createPalette('landColorPalette', 'landColorPicker', updateBasemapColor);
+        createPalette('borderColorPalette', 'borderColorPicker', updateBorderColor);
+        createPalette('seaColorPalette', 'seaColorPicker', updateSeaColor);
+        createPalette('markerColorPalette', 'markerColor', updateMapFromSelection);
+
 
         window.resetMap = function() {
             document.getElementById('csvFileInput').value = '';
