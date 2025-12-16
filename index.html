@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indonesia CSV Map Plotter</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- Leaflet Draw CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+            z-index: 1;
+            /* Default background for standard tiles */
+            background-color: #ddd; 
+        }
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            z-index: 1000;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        /* Minimized State */
+        .control-panel.minimized {
+            width: auto;
+            min-width: 150px;
+            padding: 10px 15px;
+            overflow: hidden;
+        }
+        .control-panel.minimized #panelContent {
+            display: none;
+        }
+        .control-panel.minimized h2 {
+            font-size: 1rem;
+            margin-bottom: 0;
+        }
+        
+        /* Custom scrollbar for popup content */
+        .leaflet-popup-content-wrapper {
+            border-radius: 6px;
+        }
+
+        /* Label Styling */
+        .map-label {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            font-weight: bold;
+            color: #333;
+            text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+            font-size: 12px;
+        }
+        
+        /* Toggle visibility class */
+        .hide-labels .leaflet-tooltip {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Map Container -->
+    <div id="map" class="hide-labels"></div>
+
+    <!-- Floating Control Panel -->
+    <div class="control-panel" id="controlPanel">
+        <!-- Header with Toggle Button -->
+        <div class="flex justify-between items-center mb-2">
+            <h2 class="text-xl font-bold text-gray-800 m-0">Map Controls</h2>
+            <button onclick="togglePanel()" class="text-gray-500 hover:text-gray-800 focus:outline-none p-1 rounded hover:bg-gray-100" title="Toggle Panel">
+                <svg id="toggleIcon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 transform transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+        </div>
+
+        <div id="panelContent">
+            <!-- Basemap Selector -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Map Style</label>
+                <select id="basemapSelect" onchange="changeBasemap(this.value)" class="block w-full text-sm border-gray-300 rounded p-1 border bg-white focus:ring-blue-500 focus:border-blue-500">
+                    <option value="osm">Standard (OpenStreetMap)</option>
+                    <option value="satellite">Satellite (Esri)</option>
+                    <option value="light">Clean Light (CartoDB)</option>
+                    <option value="dark">Dark Mode (CartoDB)</option>
+                    <option value="indonesia_vector">Indonesia Only (Vector)</option>
+                </select>
+                
+                <!-- Vector Map Controls (Hidden unless Vector map is selected) -->
+                <div id="vectorControls" class="hidden mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Land Color</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" id="basemapColorPicker" value="#f2efe9" oninput="updateBasemapColor(this.value)" class="h-8 w-full cursor-pointer rounded border border-gray-300 p-0.5 bg-white">
+                    </div>
+                </div>
+
+                <div id="vectorLoading" class="hidden text-xs text-blue-500 italic mt-1">Loading vector map...</div>
+            </div>
+
+            <!-- Layer Options -->
+            <div class="mb-4 border-t border-gray-200 pt-3">
+                <h3 class="text-sm font-bold text-gray-700 mb-2">Layer Options</h3>
+                
+                <div class="flex items-center mb-2">
+                    <input type="checkbox" id="showLabelsCheck" onchange="toggleLabels()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="showLabelsCheck" class="ml-2 block text-sm text-gray-900">
+                        Show Labels on Map
+                    </label>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="showIndonesiaCheck" onchange="toggleIndonesiaOverlay()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="showIndonesiaCheck" class="ml-2 block text-sm text-gray-900">
+                        Show Province Borders
+                    </label>
+                    <span id="geoJsonLoading" class="hidden ml-2 text-xs text-blue-500 italic">Loading...</span>
+                </div>
+            </div>
+            
+            <!-- Export Options -->
+            <div class="mb-4 border-t border-gray-200 pt-3">
+                <h3 class="text-sm font-bold text-gray-700 mb-2">Export Map</h3>
+                
+                <!-- Drawing Controls -->
+                <div class="mb-2 flex gap-2">
+                    <button id="drawBtn" onclick="toggleDraw()" class="w-full bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold py-1 px-2 rounded text-xs border border-blue-300 transition">
+                        Select Area
+                    </button>
+                    <button id="clearDrawBtn" onclick="clearDraw()" class="hidden w-1/3 bg-red-100 hover:bg-red-200 text-red-800 font-semibold py-1 px-2 rounded text-xs border border-red-300 transition">
+                        Clear
+                    </button>
+                </div>
+                <div id="drawInstructions" class="hidden text-xs text-gray-500 italic mb-2">
+                    Click and drag on map to draw rectangle.
+                </div>
+
+                <div class="flex flex-col gap-2 mb-2">
+                    <div class="flex gap-2">
+                        <div class="w-1/2">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Scale (Res)</label>
+                            <select id="exportScale" class="w-full text-sm border-gray-300 rounded p-1 border bg-white">
+                                <option value="1">1x (Screen)</option>
+                                <option value="2" selected>2x (High)</option>
+                                <option value="4">4x (Ultra)</option>
+                            </select>
+                        </div>
+                        <div class="w-1/2 flex items-end">
+                            <button onclick="downloadMap()" id="downloadBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm transition flex justify-center items-center">
+                                <span>Download PNG</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- SVG Export Button (Hidden by default) -->
+                    <button onclick="downloadSVG()" id="downloadSvgBtn" class="hidden w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-1 px-3 rounded text-sm transition">
+                        Download SVG (Vector Only)
+                    </button>
+                </div>
+            </div>
+
+            <hr class="border-gray-200 mb-4">
+
+            <p class="text-sm text-gray-600 mb-4">
+                Upload a CSV with <code>latitude</code> and <code>longitude</code> columns to plot new pins.
+            </p>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Upload CSV</label>
+                <input type="file" id="csvFileInput" accept=".csv" 
+                       class="block w-full text-sm text-gray-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-full file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-blue-50 file:text-blue-700
+                              hover:file:bg-blue-100 cursor-pointer"/>
+            </div>
+
+            <!-- Column Mapping Controls (Hidden by default until data loads) -->
+            <div id="columnMapping" class="hidden mb-4 border-t border-gray-200 pt-4">
+                <h3 class="text-sm font-bold text-gray-700 mb-2">Column Mapping</h3>
+                
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Latitude</label>
+                        <select id="latSelect" class="w-full text-sm border-gray-300 rounded p-1 border"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Longitude</label>
+                        <select id="lngSelect" class="w-full text-sm border-gray-300 rounded p-1 border"></select>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Label (Popup Title)</label>
+                    <select id="labelSelect" class="w-full text-sm border-gray-300 rounded p-1 border"></select>
+                </div>
+                
+                <button onclick="updateMapFromSelection()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-xs transition">
+                    Re-Plot Map
+                </button>
+            </div>
+
+            <div class="bg-gray-50 p-3 rounded border border-gray-200 text-xs text-gray-500">
+                <strong>Current Status:</strong> <span id="statusText">Showing default data</span>
+                <div id="statCount" class="mt-1">Points: 6</div>
+            </div>
+            
+            <button onclick="resetMap()" class="mt-4 w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded transition">
+                Reset to Default
+            </button>
+        </div>
+    </div>
+
+    <!-- Scripts: Leaflet, PapaParse, html2canvas, Leaflet Draw -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <script>
+        // --- 1. Map Initialization ---
+        // Center on Indonesia (approx -2.5, 118)
+        const map = L.map('map', {
+            preferCanvas: true // Keeps markers fast, but we MUST force SVG for vector exports
+        }).setView([-2.5489, 118.0149], 5);
+
+        // Define a shared SVG renderer for our vector layers to ensure they are exportable
+        // and share the same container.
+        const sharedSvgRenderer = L.svg();
+
+        // --- Tile Layers Definition ---
+        const basemaps = {
+            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap',
+                crossOrigin: 'anonymous'
+            }),
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri',
+                crossOrigin: 'anonymous'
+            }),
+            light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 20,
+                crossOrigin: 'anonymous'
+            }),
+            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 20,
+                crossOrigin: 'anonymous'
+            })
+        };
+
+        // Standard Layers
+        let currentBasemap = basemaps.osm;
+        currentBasemap.addTo(map);
+
+        // Special Layers
+        let markersLayer = L.layerGroup().addTo(map);
+        let indonesiaOverlayLayer = null; // The red borders overlay
+        let indonesiaBasemapLayer = null; // The solid vector basemap
+        
+        // Drawing Layer
+        let drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+        let drawHandler = null;
+        let exportRectangle = null;
+        
+        let currentData = [];
+        const GEOJSON_URL = 'https://raw.githubusercontent.com/superpikar/indonesia-geojson/master/indonesia-province-simple.json';
+
+        // --- 2. UI Functions ---
+
+        async function changeBasemap(style) {
+            // 1. Remove existing basemap/tiles
+            if (currentBasemap) {
+                map.removeLayer(currentBasemap);
+                currentBasemap = null;
+            }
+            if (indonesiaBasemapLayer) {
+                map.removeLayer(indonesiaBasemapLayer);
+            }
+
+            const vectorControls = document.getElementById('vectorControls');
+            const svgBtn = document.getElementById('downloadSvgBtn');
+
+            // 2. Handle "Indonesia Vector" mode
+            if (style === 'indonesia_vector') {
+                vectorControls.classList.remove('hidden'); // Show color picker
+                svgBtn.classList.remove('hidden'); // Show SVG export button
+                document.getElementById('map').style.backgroundColor = '#aad3df'; // Ocean Blue
+                document.getElementById('vectorLoading').classList.remove('hidden');
+                
+                try {
+                    if (!indonesiaBasemapLayer) {
+                        const response = await fetch(GEOJSON_URL);
+                        const geoData = await response.json();
+                        
+                        // Get current color from picker
+                        const initialColor = document.getElementById('basemapColorPicker').value;
+
+                        indonesiaBasemapLayer = L.geoJSON(geoData, {
+                            renderer: sharedSvgRenderer, // Force SVG renderer!
+                            style: {
+                                color: "#999",
+                                weight: 1,
+                                fillColor: initialColor, 
+                                fillOpacity: 1
+                            }
+                        });
+                    }
+                    indonesiaBasemapLayer.addTo(map);
+                    indonesiaBasemapLayer.bringToBack();
+                    
+                    // Zoom to Indonesia to look nice
+                    map.fitBounds(indonesiaBasemapLayer.getBounds());
+
+                } catch (e) {
+                    console.error(e);
+                    alert("Failed to load Indonesia Vector Map.");
+                    // Fallback
+                    changeBasemap('osm');
+                    document.getElementById('basemapSelect').value = 'osm';
+                } finally {
+                    document.getElementById('vectorLoading').classList.add('hidden');
+                }
+                
+            } else {
+                // 3. Handle Standard Tile Layers
+                vectorControls.classList.add('hidden'); // Hide color picker
+                svgBtn.classList.add('hidden'); // Hide SVG button
+                document.getElementById('map').style.backgroundColor = '#ddd'; // Reset to neutral
+                currentBasemap = basemaps[style];
+                currentBasemap.addTo(map);
+                currentBasemap.bringToBack();
+            }
+        }
+
+        function updateBasemapColor(color) {
+            if (indonesiaBasemapLayer) {
+                indonesiaBasemapLayer.setStyle({
+                    fillColor: color
+                });
+            }
+        }
+
+        function togglePanel() {
+            const panel = document.getElementById('controlPanel');
+            const icon = document.getElementById('toggleIcon');
+            
+            panel.classList.toggle('minimized');
+            
+            if (panel.classList.contains('minimized')) {
+                icon.classList.add('rotate-180');
+            } else {
+                icon.classList.remove('rotate-180');
+            }
+        }
+
+        function toggleLabels() {
+            const mapDiv = document.getElementById('map');
+            const isChecked = document.getElementById('showLabelsCheck').checked;
+            
+            if (isChecked) {
+                mapDiv.classList.remove('hide-labels');
+            } else {
+                mapDiv.classList.add('hide-labels');
+            }
+        }
+
+        async function toggleIndonesiaOverlay() {
+            const isChecked = document.getElementById('showIndonesiaCheck').checked;
+            const loadingIndicator = document.getElementById('geoJsonLoading');
+
+            if (isChecked) {
+                if (indonesiaOverlayLayer) {
+                    map.addLayer(indonesiaOverlayLayer);
+                } else {
+                    loadingIndicator.classList.remove('hidden');
+                    try {
+                        const response = await fetch(GEOJSON_URL);
+                        if (!response.ok) throw new Error('Network error');
+                        
+                        const geoData = await response.json();
+                        
+                        indonesiaOverlayLayer = L.geoJSON(geoData, {
+                            renderer: sharedSvgRenderer, // Force SVG renderer so it shares container with basemap
+                            style: function (feature) {
+                                return {
+                                    color: "#FF0000",
+                                    weight: 2,
+                                    opacity: 0.6,
+                                    fillColor: "#ffaaaa",
+                                    fillOpacity: 0.1
+                                };
+                            },
+                            onEachFeature: function (feature, layer) {
+                                if (feature.properties && feature.properties.Propinsi) {
+                                    layer.bindTooltip(feature.properties.Propinsi, {
+                                        sticky: true,
+                                        className: 'bg-white px-2 py-1 border border-gray-300 rounded text-xs'
+                                    });
+                                }
+                            }
+                        }).addTo(map);
+                        
+                    } catch (error) {
+                        console.error("Error fetching GeoJSON:", error);
+                        alert("Failed to load Indonesia borders.");
+                        document.getElementById('showIndonesiaCheck').checked = false;
+                    } finally {
+                        loadingIndicator.classList.add('hidden');
+                    }
+                }
+            } else {
+                if (indonesiaOverlayLayer) {
+                    map.removeLayer(indonesiaOverlayLayer);
+                }
+            }
+        }
+
+        // --- 3. Drawing Logic ---
+        function toggleDraw() {
+            const drawBtn = document.getElementById('drawBtn');
+            const instructions = document.getElementById('drawInstructions');
+
+            if (drawHandler && drawHandler._enabled) {
+                // Cancel drawing
+                drawHandler.disable();
+                drawBtn.innerText = "Select Area";
+                drawBtn.classList.remove('bg-yellow-100', 'text-yellow-800', 'border-yellow-300');
+                drawBtn.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-300');
+                instructions.classList.add('hidden');
+                drawHandler = null;
+            } else {
+                // Start drawing
+                drawHandler = new L.Draw.Rectangle(map, {
+                    shapeOptions: {
+                        color: '#2563eb', // Tailwind blue-600
+                        weight: 2,
+                        dashArray: '5, 5',
+                        fillOpacity: 0.1
+                    }
+                });
+                drawHandler.enable();
+                drawBtn.innerText = "Cancel Drawing";
+                drawBtn.classList.remove('bg-blue-100', 'text-blue-800', 'border-blue-300');
+                drawBtn.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-300');
+                instructions.classList.remove('hidden');
+            }
+        }
+
+        map.on(L.Draw.Event.CREATED, function (e) {
+            var layer = e.layer;
+            
+            // Remove previous rectangle if exists
+            drawnItems.clearLayers();
+            
+            drawnItems.addLayer(layer);
+            exportRectangle = layer;
+            
+            // Reset UI
+            document.getElementById('clearDrawBtn').classList.remove('hidden');
+            
+            // Manually reset toggle button
+            const drawBtn = document.getElementById('drawBtn');
+            drawBtn.innerText = "Select Area";
+            drawBtn.classList.remove('bg-yellow-100', 'text-yellow-800', 'border-yellow-300');
+            drawBtn.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-300');
+            document.getElementById('drawInstructions').classList.add('hidden');
+            
+            drawHandler = null;
+        });
+
+        function clearDraw() {
+            drawnItems.clearLayers();
+            exportRectangle = null;
+            document.getElementById('clearDrawBtn').classList.add('hidden');
+        }
+
+        // --- 4. Export Functionality ---
+        function downloadSVG() {
+            // 1. Find the SVG overlay container
+            const svgOverlay = document.querySelector('.leaflet-overlay-pane svg');
+            if (!svgOverlay) {
+                alert("No vector map data found to export. Ensure 'Indonesia Only (Vector)' is selected.");
+                return;
+            }
+
+            // 2. Clone it to modify without touching the DOM
+            const svgClone = svgOverlay.cloneNode(true);
+            
+            // 3. Calculate ViewBox
+            let bounds;
+            if (exportRectangle) {
+                bounds = exportRectangle.getBounds();
+            } else {
+                bounds = map.getBounds();
+            }
+
+            const topLeft = map.latLngToLayerPoint(bounds.getNorthWest());
+            const bottomRight = map.latLngToLayerPoint(bounds.getSouthEast());
+            
+            const x = topLeft.x;
+            const y = topLeft.y;
+            const width = bottomRight.x - topLeft.x;
+            const height = bottomRight.y - topLeft.y;
+
+            svgClone.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
+            svgClone.setAttribute('width', width);
+            svgClone.setAttribute('height', height);
+            
+            // Add XML Namespace if missing for standalone file validity
+            svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            
+            // Reset styles that positioning relative to screen
+            svgClone.style.transform = '';
+            svgClone.style.left = '0';
+            svgClone.style.top = '0';
+
+            // 4. Inject Markers (Pins) as Circles
+            const latKey = document.getElementById('latSelect').value;
+            const lngKey = document.getElementById('lngSelect').value;
+
+            if (currentData.length > 0 && latKey && lngKey) {
+                const markerGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                markerGroup.setAttribute("id", "markers");
+                
+                currentData.forEach(row => {
+                    if (row[latKey] && row[lngKey]) {
+                        const lat = parseFloat(row[latKey]);
+                        const lng = parseFloat(row[lngKey]);
+                        
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                            // Check if point is inside export bounds
+                            const pointLatLng = L.latLng(lat, lng);
+                            if (bounds.contains(pointLatLng)) {
+                                const pt = map.latLngToLayerPoint(pointLatLng);
+                                
+                                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                                circle.setAttribute("cx", pt.x);
+                                circle.setAttribute("cy", pt.y);
+                                circle.setAttribute("r", "4"); 
+                                circle.setAttribute("fill", "#2563eb"); 
+                                circle.setAttribute("stroke", "white");
+                                circle.setAttribute("stroke-width", "1");
+                                
+                                const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+                                title.textContent = row[document.getElementById('labelSelect').value] || "Location";
+                                circle.appendChild(title);
+
+                                markerGroup.appendChild(circle);
+                            }
+                        }
+                    }
+                });
+                svgClone.appendChild(markerGroup);
+            }
+
+            // 5. Serialize and Download
+            const serializer = new XMLSerializer();
+            let source = serializer.serializeToString(svgClone);
+
+            const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `indonesia-map-vector-${new Date().toISOString().slice(0,19)}.svg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function downloadMap() {
+            const btn = document.getElementById('downloadBtn');
+            const originalText = btn.innerText;
+            btn.innerText = "Capturing...";
+            btn.disabled = true;
+
+            const mapElement = document.getElementById('map');
+            const scale = parseInt(document.getElementById('exportScale').value);
+            
+            let captureOptions = {
+                scale: scale,
+                useCORS: true,
+                allowTaint: true,
+                logging: false,
+                ignoreElements: (element) => {
+                    return element.id === 'controlPanel';
+                }
+            };
+
+            // If an area is selected, calculate crop coordinates
+            if (exportRectangle) {
+                // Hide the blue rectangle so it doesn't show in the photo
+                drawnItems.removeLayer(exportRectangle);
+
+                const bounds = exportRectangle.getBounds();
+                const northWest = map.latLngToContainerPoint(bounds.getNorthWest());
+                const southEast = map.latLngToContainerPoint(bounds.getSouthEast());
+
+                captureOptions.x = northWest.x;
+                captureOptions.y = northWest.y;
+                captureOptions.width = southEast.x - northWest.x;
+                captureOptions.height = southEast.y - northWest.y;
+            }
+            
+            // Wait a moment for DOM/UI updates
+            setTimeout(() => {
+                html2canvas(mapElement, captureOptions).then(canvas => {
+                    // Create download link
+                    const link = document.createElement('a');
+                    link.download = `indonesia-map-${new Date().toISOString().slice(0,19)}.png`;
+                    link.href = canvas.toDataURL();
+                    link.click();
+                    
+                    // Cleanup & Reset
+                    if (exportRectangle) {
+                        drawnItems.addLayer(exportRectangle); // Show rectangle again
+                    }
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }).catch(err => {
+                    console.error("Export failed:", err);
+                    alert("Failed to export map. This may be due to browser security restrictions on cross-origin images or the area being off-screen.");
+                    
+                    if (exportRectangle) drawnItems.addLayer(exportRectangle);
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                });
+            }, 100);
+        }
+
+        // --- 5. Default "Mock" CSV Data ---
+        const defaultCSV = `name,latitude,longitude,description
+Jakarta,-6.2088,106.8456,Capital City
+Bali (Denpasar),-8.6705,115.2126,Tourism Hub
+Surabaya,-7.2575,112.7521,Second Largest City
+Medan,3.5952,98.6722,North Sumatra
+Makassar,-5.1477,119.4327,Gateway to Eastern Indonesia
+Raja Ampat,-0.2333,130.5167,Diving Paradise`;
+
+        // --- 6. CSV Parsing & Plotting Logic ---
+
+        function processData(csvText) {
+            Papa.parse(csvText, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.errors.length > 0) {
+                        console.warn("CSV Errors:", results.errors);
+                    }
+                    
+                    currentData = results.data;
+                    
+                    if (currentData.length > 0) {
+                        const headers = Object.keys(currentData[0]);
+                        setupDropdowns(headers);
+                        document.getElementById('columnMapping').classList.remove('hidden');
+                        updateMapFromSelection();
+                    }
+                }
+            });
+        }
+
+        function setupDropdowns(headers) {
+            const latSelect = document.getElementById('latSelect');
+            const lngSelect = document.getElementById('lngSelect');
+            const labelSelect = document.getElementById('labelSelect');
+            
+            [latSelect, lngSelect, labelSelect].forEach(sel => sel.innerHTML = '');
+            
+            headers.forEach(header => {
+                [latSelect, lngSelect, labelSelect].forEach(sel => {
+                    const option = document.createElement('option');
+                    option.value = header;
+                    option.text = header;
+                    sel.appendChild(option);
+                });
+            });
+
+            latSelect.value = headers.find(k => /^(lat|latitude|y)$/i.test(k)) || headers[0];
+            lngSelect.value = headers.find(k => /^(lon|lng|longitude|x)$/i.test(k)) || headers[1] || headers[0];
+            labelSelect.value = headers.find(k => /^(name|label|city|title|desc|description)$/i.test(k)) || headers[0];
+        }
+
+        function updateMapFromSelection() {
+            const latCol = document.getElementById('latSelect').value;
+            const lngCol = document.getElementById('lngSelect').value;
+            const labelCol = document.getElementById('labelSelect').value;
+            
+            plotPoints(currentData, latCol, lngCol, labelCol);
+        }
+
+        function plotPoints(data, latKey, lngKey, labelKey) {
+            markersLayer.clearLayers();
+            let bounds = L.latLngBounds();
+            let count = 0;
+
+            data.forEach(row => {
+                if (row[latKey] && row[lngKey]) {
+                    const lat = parseFloat(row[latKey]);
+                    const lng = parseFloat(row[lngKey]);
+
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        const marker = L.marker([lat, lng]);
+                        
+                        let popupContent = `<div class="font-bold text-lg">${row[labelKey] || 'Location'}</div>`;
+                        let details = "";
+                        Object.keys(row).forEach(k => {
+                            if (k !== latKey && k !== lngKey && k !== labelKey && row[k]) {
+                                details += `<b>${k}:</b> ${row[k]}<br>`;
+                            }
+                        });
+                        if (details) popupContent += `<div class="text-sm mt-2">${details}</div>`;
+                        marker.bindPopup(popupContent);
+
+                        if (row[labelKey]) {
+                            marker.bindTooltip(row[labelKey], {
+                                permanent: true,
+                                direction: 'bottom',
+                                className: 'map-label',
+                                offset: [0, 5]
+                            });
+                        }
+
+                        markersLayer.addLayer(marker);
+                        bounds.extend([lat, lng]);
+                        count++;
+                    }
+                }
+            });
+
+            document.getElementById('statCount').innerText = `Points: ${count}`;
+            
+            if (count > 0) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+
+        // --- 7. Event Listeners ---
+
+        document.getElementById('csvFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                document.getElementById('statusText').innerText = `Loaded: ${file.name}`;
+                processData(text);
+            };
+            reader.readAsText(file);
+        });
+
+        window.resetMap = function() {
+            document.getElementById('csvFileInput').value = '';
+            document.getElementById('statusText').innerText = "Showing default data";
+            processData(defaultCSV);
+        };
+
+        processData(defaultCSV);
+
+    </script>
+</body>
+</html>
